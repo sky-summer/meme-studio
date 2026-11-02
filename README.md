@@ -49,21 +49,29 @@ MEME_API=<接口地址> PORT=8080 node server.js
 页面本身是纯静态的，推到仓库后在 **Settings → Pages** 选择 `main` 分支、`/ (root)` 即可，
 访问 `https://<用户名>.github.io/<仓库名>/`。
 
-> ⚠️ 本地接口服务只有 `http://`，而 GitHub Pages 跑在 HTTPS 下，浏览器会以「混合内容」为由拦截请求。
-> 线上必须准备一个 **HTTPS 反向代理**，两种填法任选：
+> ⚠️ 接口服务只有 `http://`，而 GitHub Pages 跑在 HTTPS 下，浏览器会以「混合内容」为由拦截请求；
+> 同时浏览器无法隐藏请求里的目标地址。所以线上必须经过一个 **HTTPS 反向代理**：
+> 浏览器只访问代理域名，真实接口地址只保存在代理服务端。
 >
-> 1. 页面「接口地址」输入框直接填代理地址（存进 localStorage，下次自动连接）；
-> 2. 或修改 `config.js` 里的 `window.MEME_API_BASE` 后推送。
+> 本仓库自带一个可直接部署的 Cloudflare Worker（`worker/`）：
 >
-> 代理可以用 cloudflared 临时隧道一键得到：
+> ```bash
+> cd worker
+> npx wrangler deploy                  # 得到 https://meme-proxy.<子域>.workers.dev
+> npx wrangler secret put ORIGIN       # 粘入真实接口地址，只存在 Cloudflare 侧
+> ```
+>
+> 然后把 Worker 域名填进 `config.js` 的 `window.MEME_API_BASE`（或页面「接口地址」输入框）即可。
+>
+> 也可以改用 cloudflared 隧道，同样只暴露一个 HTTPS 域名：
 >
 > ```bash
 > cloudflared tunnel --url <你的接口地址>
 > # 得到形如 https://xxx-xxx.trycloudflare.com 的地址
 > ```
 >
-> 自建 Nginx / Vercel / Cloudflare Worker 也可以，注意响应头需要带
-> `Access-Control-Allow-Origin: *`（本地 `server.js` 已经做了这件事）。
+> 自建 Nginx / Vercel 也行，注意响应头需要带 `Access-Control-Allow-Origin: *`
+> （Worker 脚本和本地 `server.js` 都已经做了这件事）。
 
 ## 说明
 
