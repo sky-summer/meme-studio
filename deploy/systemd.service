@@ -1,0 +1,20 @@
+# 表情包工坊 —— systemd 单元（用 node server.js 常驻时使用）
+# 用法：拷到 /etc/systemd/system/meme-studio.service，按实际路径修改后：
+#   sudo systemctl daemon-reload && sudo systemctl enable --now meme-studio
+
+[Unit]
+Description=Meme Studio (static + /api proxy)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/meme-studio
+ExecStart=/usr/bin/node /var/www/meme-studio/server.js
+EnvironmentFile=-/var/www/meme-studio/.env
+Restart=always
+RestartSec=3
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target

@@ -3,7 +3,7 @@
   'use strict';
 
   const CACHE_KEY = 'meme-studio:info:v1';
-  const STORE_API = 'meme-studio:api';
+  const API_BASE = '/api';
   const MAX_IMAGE_SLOTS = 4;
   const MAX_TEXT_SLOTS = 6;
   const INFO_CONCURRENCY = 4;
@@ -31,8 +31,6 @@
     download: $('download'),
     sheet: $('sheet'),
     reset: $('reset'),
-    apiInput: $('apiInput'),
-    apiSave: $('apiSave'),
     ph: $('ph'),
     tplPreview: $('tplPreview'),
     preview: $('preview'),
@@ -43,7 +41,7 @@
   };
 
   const state = {
-    base: null,
+    base: API_BASE,
     keys: [],
     info: new Map(),
     previews: new Map(),
@@ -79,33 +77,9 @@
     }
   }
 
-  function configuredBase() {
-    let stored = '';
-    try {
-      stored = localStorage.getItem(STORE_API) || '';
-    } catch {
-      stored = '';
-    }
-    const fromWindow = typeof window.MEME_API_BASE === 'string' ? window.MEME_API_BASE : '';
-    return (stored || fromWindow).trim().replace(/\/+$/, '');
-  }
-
-  function baseCandidates() {
-    const list = [];
-    if (location.protocol === 'http:' || location.protocol === 'https:') {
-      list.push(`${location.origin}/api`);
-    }
-    const configured = configuredBase();
-    if (configured) list.push(configured);
-    return [...new Set(list)];
-  }
-
+  /* 只走同源 /api：由服务器上的 Nginx 或 server.js 转发到真实接口 */
   async function resolveBase() {
-    for (const base of baseCandidates()) {
-      const hit = await probe(base);
-      if (hit) return hit;
-    }
-    return null;
+    return probe(API_BASE);
   }
 
   const infoQueue = [];
@@ -721,9 +695,6 @@
 
   async function connect(hit) {
     resetUi();
-    state.base = hit.base;
-    const sameOrigin = hit.base === `${location.origin}/api`;
-    el.apiInput.value = sameOrigin ? '' : hit.base;
     setStatus(`已连接 · ${hit.version.replace(/"/g, '')}`, 'ok');
 
     try {
@@ -747,56 +718,17 @@
 
   async function boot() {
     restoreCache();
-    el.apiInput.value = configuredBase();
     setStatus('连接中…', 'wait');
     const hit = await resolveBase();
     if (!hit) {
       setStatus('接口不可达', 'bad');
       el.tplMeta.textContent = '加载失败';
-      const configured = configuredBase();
       el.hint.textContent =
-        location.protocol === 'https:' && configured.startsWith('http://')
-          ? 'HTTPS 页面无法请求 http:// 接口：浏览器会以「混合内容」为由拦截，建议本地 node server.js 使用，或改用 HTTPS 代理'
-          : '未连接到接口：请确认已用 node server.js 启动本地代理，或在「接口地址」中填写可用地址';
+        '无法连接同源 /api：请确认服务器上的 Nginx 已转发 /api/，或直接用 node server.js 启动服务';
       return;
     }
     connect(hit);
   }
-
-  el.apiSave.addEventListener('click', async () => {
-    const raw = el.apiInput.value.trim().replace(/\/+$/, '');
-    if (!raw) {
-      try {
-        localStorage.removeItem(STORE_API);
-      } catch {
-        /* 忽略 */
-      }
-      el.hint.textContent = '已清除自定义地址，正在重新探测…';
-      const hit = await resolveBase();
-      if (hit) connect(hit);
-      else el.hint.textContent = '自动探测失败，请手动填写接口地址';
-      return;
-    }
-    if (location.protocol === 'https:' && !raw.startsWith('https://')) {
-      el.hint.textContent = 'HTTPS 页面只能填写 https:// 开头的接口地址';
-      return;
-    }
-    el.apiSave.disabled = true;
-    el.apiSave.textContent = '连接中…';
-    const hit = await probe(raw);
-    el.apiSave.disabled = false;
-    el.apiSave.textContent = '连接';
-    if (!hit) {
-      el.hint.textContent = `连接失败：${raw}（地址不可达，或对方未开放跨域）`;
-      return;
-    }
-    try {
-      localStorage.setItem(STORE_API, raw);
-    } catch {
-      /* 隐私模式下忽略 */
-    }
-    connect(hit);
-  });
 
   boot();
 })();

@@ -1,13 +1,7 @@
 node_modules/
 .env
-.wrangler/
 .DS_Store
 Thumbs.db
 *.log
 .vscode/
 .idea/
-_e2e*.js
-_check.js
-_publish.js
-.gh_token
-gh_askpass.cmd

@@ -1,79 +1,124 @@
 # 表情包工坊 · Meme Studio
 
-纯静态表情包生成器，界面直接对接 **meme-generator** 服务：
-859 个模板，填写文字 / 上传图片后由服务端实时渲染，支持 JPG、PNG、GIF 动图输出与下载。
+纯静态表情包生成器，对接 **meme-generator** 服务：选择模板、填写文字 / 上传图片后由服务端渲染，
+支持 JPG、PNG、GIF 动图输出与下载。
 
-> 仓库里不保存任何真实服务地址，接口地址通过 `.env`（本地）或页面「接口地址」输入框（线上）配置。
+> 本项目的部署目标只有一个：**Linux 服务器**。页面通过同源 `/api` 访问真实接口，
+> 真实地址只写在服务器上的 `.env`（或 Nginx 配置）里，不进仓库、不出现在页面中。
 
 ## 功能
 
-| 功能 | 用到的接口 |
+| 功能 | 接口 |
 | --- | --- |
 | 连接状态、版本号 | `GET /meme/version` |
 | 模板列表 | `GET /memes/keys` |
 | 模板参数（图片数、文字数、默认文字、高级参数） | `GET /memes/{key}/info` |
-| 模板示例图预览 | `GET /memes/{key}/preview` |
+| 模板示例图 | `GET /memes/{key}/preview` |
 | 生成表情包 | `POST /memes/{key}/`（multipart：`images` + `texts` + `args`） |
 | 模板总览图（全部 / 当前筛选） | `POST /memes/render_list` |
 
 ## 目录
 
 ```
-index.html      页面结构
-app.js          全部前端逻辑（接口调用、表单、预览、下载）
-style.css       样式
-config.js       部署配置：接口（代理）地址
-server.js       本地静态服务 + /api 反向代理（零依赖，解决跨域）
-.env.example    本地接口地址配置示例
+index.html          页面结构
+app.js              前端逻辑（全部走同源 /api）
+style.css           样式
+server.js           静态托管 + /api 反向代理（零依赖，可选）
+.env.example        接口地址配置示例（复制为 .env）
+deploy/nginx.conf       Nginx 站点配置示例
+deploy/systemd.service  systemd 单元（用 node 常驻时）
 ```
 
-## 本地运行
-
-接口服务没有返回 CORS 头，浏览器不能跨域直连，所以本地要走 `server.js` 的代理：
+## 一、准备
 
 ```bash
-cp .env.example .env      # 填入 MEME_API=<你的接口地址>
-node server.js            # 打开 http://localhost:8080
+sudo mkdir -p /var/www/meme-studio
+# 把 index.html app.js style.css server.js .env.example 上传到上面目录
 ```
 
-也可以用环境变量临时指定：
+服务器需要能访问接口，先验证：
 
 ```bash
-MEME_API=<接口地址> PORT=8080 node server.js
+curl -s http://<接口地址>/meme/version
 ```
 
-没配置 `MEME_API` 时，`/api/*` 会返回 503 并在控制台提示。
+## 二、部署方式 A：Nginx 直接托管（不需要 Node）
 
-## 部署到 GitHub Pages
+`deploy/nginx.conf` 拷到 `/etc/nginx/conf.d/meme-studio.conf`，改两处：`server_name` 和 `proxy_pass`。
 
-页面本身是纯静态的，推到仓库后在 **Settings → Pages** 选择 `main` 分支、`/ (root)` 即可，
-访问 `https://<用户名>.github.io/<仓库名>/`。
+```nginx
+server {
+    listen 80;
+    server_name _;                       # 或你的域名 / 服务器 IP
+    root /var/www/meme-studio;
+    index index.html;
+    client_max_body_size 20m;
 
-> ⚠️ 接口服务只有 `http://`，而 GitHub Pages 跑在 HTTPS 下，浏览器会以「混合内容」为由拦截请求；
-> 同时浏览器无法隐藏请求里的目标地址。所以线上必须经过一个 **HTTPS 反向代理**：
-> 浏览器只访问代理域名，真实接口地址只保存在代理服务端。
->
-> 本仓库自带一个可直接部署的 Cloudflare Worker（`worker/`）：
->
-> ```bash
-> cd worker
-> npx wrangler deploy                  # 得到 https://meme-proxy.<子域>.workers.dev
-> npx wrangler secret put ORIGIN       # 粘入真实接口地址，只存在 Cloudflare 侧
-> ```
->
-> 然后把 Worker 域名填进 `config.js` 的 `window.MEME_API_BASE`（或页面「接口地址」输入框）即可。
->
-> 也可以改用 cloudflared 隧道，同样只暴露一个 HTTPS 域名：
->
-> ```bash
-> cloudflared tunnel --url <你的接口地址>
-> # 得到形如 https://xxx-xxx.trycloudflare.com 的地址
-> ```
->
-> 自建 Nginx / Vercel 也行，注意响应头需要带 `Access-Control-Allow-Origin: *`
-> （Worker 脚本和本地 `server.js` 都已经做了这件事）。
+    location /api/ {
+        proxy_pass http://<接口地址>/;    # 结尾斜杠不能少
+        proxy_set_header Host <接口地址>;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
 
-## 说明
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
 
-- 模板列表与关键词元数据会缓存在 localStorage（`meme-studio:info:v1`），命中缓存后不再重复请求。
-- 总览图渲染全部模板约需 30 秒，文件可达数 MB，点击预览图可查看原图。
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+curl -s http://127.0.0.1/api/meme/version      # 应返回 "0.1.14"
+```
+
+打开 `http://<服务器IP>/` 即可使用。
+
+## 三、部署方式 B：Node 常驻（自带代理，无需额外配置 Nginx 的 /api）
+
+```bash
+cd /var/www/meme-studio
+cp .env.example .env
+vi .env                      # 填 MEME_API=<接口地址>，PORT=8080
+node server.js               # 先手工跑一遍确认
+```
+
+常驻：
+
+```bash
+sudo cp deploy/systemd.service /etc/systemd/system/meme-studio.service
+sudo vi /etc/systemd/system/meme-studio.service   # 改 WorkingDirectory / ExecStart 路径
+sudo systemctl daemon-reload
+sudo systemctl enable --now meme-studio
+```
+
+Nginx 整站反代（含可选 HTTPS）：
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_read_timeout 300s;
+    client_max_body_size 20m;
+}
+```
+
+## 四、HTTPS（可选）
+
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d <你的域名>
+```
+
+因为页面和 `/api` 同源，HTTP/HTTPS 都能正常生成，不存在跨域和混合内容问题。
+
+## 五、排查
+
+| 现象 | 处理 |
+| --- | --- |
+| 页面显示「无法连接同源 /api」 | 检查 Nginx `location /api/` 的 `proxy_pass` 是否带结尾斜杠；`curl http://127.0.0.1/api/meme/version` |
+| 502 / 504 | 服务器到接口不通，或渲染总览图超时（`proxy_read_timeout` 调到 300s） |
+| 上传大图 413 | 调大 `client_max_body_size` |
+| 模板列表空 | 接口 `/memes/keys` 返回带 BOM，前端已兼容；确认 HTTP 状态 200 |
+| 总览图慢 | 全部模板约 30 秒、数 MB，属正常 |

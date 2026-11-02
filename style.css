@@ -232,22 +232,6 @@ textarea::placeholder {
   color: #5c6879;
 }
 
-/* ---------------- 接口设置 ---------------- */
-.api-field {
-  border-top: 1px dashed var(--line);
-  padding-top: 12px;
-}
-
-.api-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-}
-
-.api-row .btn {
-  padding: 9px 14px;
-}
-
 /* ---------------- 文字输入 ---------------- */
 .text-rows {
   display: flex;
