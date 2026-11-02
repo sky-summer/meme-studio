@@ -1,8 +1,7 @@
-/* 表情包工坊 —— 对接 meme-generator 接口（120.48.4.118:2233）渲染表情包 */
+/* 表情包工坊 —— 对接 meme-generator 接口渲染表情包 */
 (() => {
   'use strict';
 
-  const DIRECT_BASE = 'http://120.48.4.118:2233';
   const CACHE_KEY = 'meme-studio:info:v1';
   const STORE_API = 'meme-studio:api';
   const MAX_IMAGE_SLOTS = 4;
@@ -41,7 +40,6 @@
     stageTag: $('stageTag'),
     hint: $('hint'),
     stats: $('stats'),
-    apiBase: $('apiBase'),
   };
 
   const state = {
@@ -100,7 +98,6 @@
     if (!https && (location.protocol === 'http:' || location.protocol === 'https:')) {
       list.push(`${location.origin}/api`);
     }
-    list.push(DIRECT_BASE);
     /* HTTPS 页面不能请求 http:// 接口（混合内容会被浏览器拦截） */
     return [...new Set(list)].filter((base) => !https || base.startsWith('https://'));
   }
@@ -729,7 +726,6 @@
     state.base = hit.base;
     const sameOrigin = hit.base === `${location.origin}/api`;
     el.apiInput.value = sameOrigin ? '' : hit.base;
-    el.apiBase.textContent = sameOrigin ? `${location.host}/api` : hit.base.replace(/^https?:\/\//, '');
     setStatus(`已连接 · ${hit.version.replace(/"/g, '')}`, 'ok');
 
     try {
@@ -761,8 +757,8 @@
       el.tplMeta.textContent = '加载失败';
       el.hint.textContent =
         location.protocol === 'https:'
-          ? 'HTTPS 页面无法直接请求 http:// 接口（混合内容会被拦截）。请在上方「接口地址」填写 HTTPS 代理地址，或本地运行 node server.js 后访问 http://localhost:8080'
-          : '无法连接 http://120.48.4.118:2233 —— 该接口没有开放 CORS，请在项目目录执行 node server.js 后打开 http://localhost:8080';
+          ? '未配置接口地址：请在上方「接口地址」填写 HTTPS 代理地址（接口本身只提供 HTTP，HTTPS 页面必须走代理）'
+          : '未连接到接口：请确认已用 node server.js 启动本地代理，或在「接口地址」中填写可用地址';
       return;
     }
     connect(hit);
