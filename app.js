@@ -91,15 +91,13 @@
   }
 
   function baseCandidates() {
-    const https = location.protocol === 'https:';
     const list = [];
-    const configured = configuredBase();
-    if (configured) list.push(configured);
-    if (!https && (location.protocol === 'http:' || location.protocol === 'https:')) {
+    if (location.protocol === 'http:' || location.protocol === 'https:') {
       list.push(`${location.origin}/api`);
     }
-    /* HTTPS 页面不能请求 http:// 接口（混合内容会被浏览器拦截） */
-    return [...new Set(list)].filter((base) => !https || base.startsWith('https://'));
+    const configured = configuredBase();
+    if (configured) list.push(configured);
+    return [...new Set(list)];
   }
 
   async function resolveBase() {
@@ -755,9 +753,10 @@
     if (!hit) {
       setStatus('接口不可达', 'bad');
       el.tplMeta.textContent = '加载失败';
+      const configured = configuredBase();
       el.hint.textContent =
-        location.protocol === 'https:'
-          ? '未配置接口地址：请在上方「接口地址」填写 HTTPS 代理地址（接口本身只提供 HTTP，HTTPS 页面必须走代理）'
+        location.protocol === 'https:' && configured.startsWith('http://')
+          ? 'HTTPS 页面无法请求 http:// 接口：浏览器会以「混合内容」为由拦截，建议本地 node server.js 使用，或改用 HTTPS 代理'
           : '未连接到接口：请确认已用 node server.js 启动本地代理，或在「接口地址」中填写可用地址';
       return;
     }
