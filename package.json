@@ -1,0 +1,13 @@
+{
+  "name": "meme-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "表情包工坊：静态页面 + 表情包接口反向代理（单进程，无需 Nginx）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
