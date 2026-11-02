@@ -128,26 +128,41 @@ function serveStatic(req, res) {
   });
 }
 
-http
-  .createServer((req, res) => {
-    if (req.method === 'OPTIONS') {
-      res.writeHead(204, {
-        'access-control-allow-origin': '*',
-        'access-control-allow-headers': '*',
-        'access-control-allow-methods': 'GET,POST,OPTIONS',
-        'access-control-max-age': '86400',
-      });
-      res.end();
-      return;
-    }
-    const pathname = new URL(req.url, 'http://localhost').pathname;
-    if (pathname === '/api' || pathname.startsWith('/api/')) proxy(req, res);
-    else serveStatic(req, res);
-  })
-  .listen(PORT, HOST, () => {
-    console.log('表情包工坊已启动');
-    console.log(`  本机访问：http://localhost:${PORT}`);
-    localAddresses().forEach((ip) => console.log(`  外部访问：http://${ip}:${PORT}`));
-    if (TARGET) console.log(`  接口代理：/api/* → ${TARGET}`);
-    else console.log('  未配置 MEME_API（.env 或环境变量），/api/* 将返回 503');
-  });
+const server = http.createServer((req, res) => {
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'access-control-allow-origin': '*',
+      'access-control-allow-headers': '*',
+      'access-control-allow-methods': 'GET,POST,OPTIONS',
+      'access-control-max-age': '86400',
+    });
+    res.end();
+    return;
+  }
+  const pathname = new URL(req.url, 'http://localhost').pathname;
+  if (pathname === '/api' || pathname.startsWith('/api/')) proxy(req, res);
+  else serveStatic(req, res);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`启动失败：端口 ${PORT} 已被占用`);
+    console.error('  1) 是否已有实例在跑：pm2 list / ss -lntp | grep ' + PORT);
+    console.error('  2) 停掉占用进程：pm2 stop <名称>  或  kill <pid>');
+    console.error('  3) 或换个端口：改 .env 里的 PORT 后重启');
+    process.exit(1);
+  }
+  if (err.code === 'EACCES') {
+    console.error(`启动失败：没有权限监听端口 ${PORT}（1024 以下端口需要 root 或 authbind）`);
+    process.exit(1);
+  }
+  throw err;
+});
+
+server.listen(PORT, HOST, () => {
+  console.log('表情包工坊已启动');
+  console.log(`  本机访问：http://localhost:${PORT}`);
+  localAddresses().forEach((ip) => console.log(`  外部访问：http://${ip}:${PORT}`));
+  if (TARGET) console.log(`  接口代理：/api/* → ${TARGET}`);
+  else console.log('  未配置 MEME_API（.env 或环境变量），/api/* 将返回 503');
+});
