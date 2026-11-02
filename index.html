@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="表情包工坊：对接 meme-generator 接口，选择模板、填写文字或上传图片，服务端实时渲染表情包并下载。" />
+    <title>表情包工坊 · Meme Studio</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">🎨</span>
+        <div class="brand-text">
+          <h1>表情包工坊</h1>
+          <p>模板由 120.48.4.118:2233 服务端渲染</p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <a class="doc-link" href="http://120.48.4.118:2233/docs" target="_blank" rel="noopener">接口文档</a>
+        <span class="status" id="status">连接中…</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel">
+        <div class="field">
+          <label class="field-label" for="search">
+            模板
+            <span class="muted" id="tplMeta">加载中…</span>
+          </label>
+          <input id="search" type="search" placeholder="搜索模板或关键词，如 举牌 / 猫 / 芙宁娜" autocomplete="off" />
+          <div class="tpl-list" id="tplList" role="listbox" aria-label="模板列表"></div>
+        </div>
+
+        <div class="field" id="imageField" hidden>
+          <label class="field-label">
+            图片
+            <span class="muted" id="imageHint"></span>
+          </label>
+          <div class="drop" id="drop" tabindex="0" role="button" aria-label="上传图片">
+            <input id="file" type="file" accept="image/*" multiple hidden />
+            <div class="drop-inner">
+              <span class="drop-icon">📥</span>
+              <strong id="dropTitle">点击或拖入图片</strong>
+              <span class="muted" id="dropSub">JPG / PNG / WEBP / GIF</span>
+            </div>
+          </div>
+          <div class="thumbs" id="thumbs"></div>
+        </div>
+
+        <div class="field" id="textField" hidden>
+          <label class="field-label">文字</label>
+          <div class="text-rows" id="textRows"></div>
+        </div>
+
+        <div class="field" id="argsField" hidden>
+          <label class="field-label" for="args">
+            高级参数
+            <span class="muted" id="argsHint"></span>
+          </label>
+          <textarea id="args" rows="3" spellcheck="false" placeholder='{"user_infos": []}'></textarea>
+        </div>
+
+        <div class="actions">
+          <button id="render" class="btn primary" type="button" disabled>生成表情包</button>
+          <button id="download" class="btn" type="button" disabled>下载</button>
+        </div>
+        <div class="actions secondary">
+          <button id="sheet" class="btn ghost" type="button" disabled>模板总览图</button>
+          <button id="reset" class="btn ghost" type="button">重置</button>
+        </div>
+
+        <div class="field api-field">
+          <label class="field-label" for="apiInput">
+            接口地址
+            <span class="muted">留空自动</span>
+          </label>
+          <div class="api-row">
+            <input id="apiInput" type="text" spellcheck="false" placeholder="https://your-proxy.example.com" />
+            <button id="apiSave" class="btn" type="button">连接</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="stage">
+        <div class="stage-inner" id="stageInner">
+          <div class="ph" id="ph">
+            <span class="ph-icon">🖼️</span>
+            <p>先选一个模板，填好内容后点击「生成表情包」</p>
+          </div>
+          <img id="tplPreview" alt="模板示例图" hidden />
+          <img id="preview" alt="表情包预览" hidden />
+          <video id="previewVideo" muted loop playsinline autoplay hidden></video>
+          <span class="stage-tag" id="stageTag" hidden>模板示例图</span>
+        </div>
+        <p class="hint" id="hint">正在连接接口…</p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>渲染在服务端完成，接口：<span id="apiBase">120.48.4.118:2233</span></span>
+      <span id="stats"></span>
+    </footer>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
