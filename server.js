@@ -1,17 +1,19 @@
 /**
- * 本地开发服务器：托管静态页面 + 反向代理表情包接口（解决浏览器跨域限制）
+ * 静态服务器 + 接口反向代理（单进程即可对外服务，不需要 Nginx）
  *
  * 用法：
- *   1) 把 .env.example 复制为 .env，填入 MEME_API=<你的接口地址>
- *   2) node server.js  →  http://localhost:8080
+ *   1) cp .env.example .env 并填入 MEME_API=<接口地址>
+ *   2) node server.js
+ *   3) 浏览器访问 http://<服务器IP>:8080
  *
- * 也可以直接用环境变量覆盖：PORT、MEME_API
+ * 环境变量：PORT（默认 8080）、MEME_API（必填）、HOST（默认 0.0.0.0）
  * 仓库里不保存任何真实服务地址。
  */
 'use strict';
 
 const http = require('http');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const ROOT = __dirname;
@@ -36,8 +38,20 @@ function loadDotEnv(file) {
 
 const fileEnv = loadDotEnv(path.join(ROOT, '.env'));
 const PORT = Number(process.env.PORT || fileEnv.PORT || 8080);
+const HOST = process.env.HOST || fileEnv.HOST || '0.0.0.0';
 const TARGET = (process.env.MEME_API || fileEnv.MEME_API || '').replace(/\/+$/, '');
 const TARGET_HOST = TARGET ? new URL(TARGET).host : '';
+
+function localAddresses() {
+  const out = [];
+  Object.values(os.networkInterfaces()).forEach((list) => {
+    (list || []).forEach((net) => {
+      const isV4 = net.family === 'IPv4' || net.family === 4;
+      if (isV4 && !net.internal) out.push(net.address);
+    });
+  });
+  return out;
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -130,8 +144,10 @@ http
     if (pathname === '/api' || pathname.startsWith('/api/')) proxy(req, res);
     else serveStatic(req, res);
   })
-  .listen(PORT, () => {
-    console.log(`表情包工坊已启动：http://localhost:${PORT}`);
-    if (TARGET) console.log(`接口代理：/api/* → ${TARGET}`);
-    else console.log('未配置 MEME_API（.env 或环境变量），/api/* 将返回 503');
+  .listen(PORT, HOST, () => {
+    console.log('表情包工坊已启动');
+    console.log(`  本机访问：http://localhost:${PORT}`);
+    localAddresses().forEach((ip) => console.log(`  外部访问：http://${ip}:${PORT}`));
+    if (TARGET) console.log(`  接口代理：/api/* → ${TARGET}`);
+    else console.log('  未配置 MEME_API（.env 或环境变量），/api/* 将返回 503');
   });
