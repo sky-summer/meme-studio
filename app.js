@@ -21,6 +21,9 @@
     file: $('file'),
     dropTitle: $('dropTitle'),
     dropSub: $('dropSub'),
+    qq: $('qq'),
+    qqBtn: $('qqBtn'),
+    qqTip: $('qqTip'),
     thumbs: $('thumbs'),
     textField: $('textField'),
     textRows: $('textRows'),
@@ -638,6 +641,109 @@
     renderThumbs();
     syncReady();
   }
+
+  /* ---------------- QQ 头像 ---------------- */
+  const QQ_RE = /^[1-9]\d{4,11}$/;
+  /* 优先走同源代理（server.js 已实现 /api/qq-avatar），失败再直连头像源 */
+  const QQ_SOURCES = [
+    (qq) => apiUrl(`/qq-avatar?qq=${qq}`),
+    (qq) => `https://q1.qlogo.cn/g?b=qq&nk=${qq}&s=640`,
+    (qq) => `https://qlogo2.store.qq.com/qzone/${qq}/${qq}/640`,
+  ];
+
+  function setQQTip(text, bad) {
+    el.qqTip.textContent = text || '';
+    el.qqTip.hidden = !text;
+    el.qqTip.classList.toggle('bad', !!bad);
+  }
+
+  async function fetchQQAvatar(qq) {
+    for (const build of QQ_SOURCES) {
+      try {
+        const res = await fetch(build(qq), { cache: 'no-store' });
+        if (!res.ok) continue;
+        const type = res.headers.get('content-type') || '';
+        if (!type.startsWith('image/')) continue;
+        const blob = await res.blob();
+        if (blob.size < 256) continue;
+        return blob;
+      } catch {
+        /* 换下一个头像源 */
+      }
+    }
+    return null;
+  }
+
+  async function useQQAvatar() {
+    const raw = el.qq.value.trim();
+    if (!raw) {
+      setQQTip('先输入 QQ 号，多个号用逗号 / 空格分隔', true);
+      el.qq.focus();
+      return;
+    }
+    const list = raw.split(/[\s,，、]+/).filter(Boolean);
+    const bad = list.find((qq) => !QQ_RE.test(qq));
+    if (bad) {
+      setQQTip(`「${bad}」不是有效 QQ 号（5~12 位数字）`, true);
+      el.qq.focus();
+      return;
+    }
+    const slots = maxImagesOf(state.params);
+    if (!slots) {
+      setQQTip('当前模板不需要图片，换个模板再用头像', true);
+      return;
+    }
+
+    el.qqBtn.disabled = true;
+    el.qqBtn.textContent = '获取中…';
+    const ok = [];
+    const failed = [];
+    for (let i = 0; i < list.length; i++) {
+      const qq = list[i];
+      setQQTip(
+        list.length > 1
+          ? `正在获取第 ${i + 1}/${list.length} 个头像（QQ ${qq}）…`
+          : `正在获取 QQ ${qq} 的头像…`
+      );
+      try {
+        const blob = await fetchQQAvatar(qq);
+        if (!blob) throw new Error('empty');
+        const type = blob.type || 'image/jpeg';
+        const ext = type.includes('png')
+          ? 'png'
+          : type.includes('webp')
+            ? 'webp'
+            : type.includes('gif')
+              ? 'gif'
+              : 'jpg';
+        /* 槽位满了就顶掉最早的一张，保证新头像一定进得去 */
+        if (state.images.length >= slots) {
+          state.images = state.images.slice(state.images.length - slots + 1);
+        }
+        addFiles([new File([blob], `qq-${qq}.${ext}`, { type })]);
+        ok.push(qq);
+      } catch {
+        failed.push(qq);
+      }
+    }
+    el.qqBtn.disabled = false;
+    el.qqBtn.textContent = '取头像';
+
+    if (ok.length && !failed.length) setQQTip(`已填入 ${ok.join('、')} 的头像`);
+    else if (ok.length) setQQTip(`已填入 ${ok.join('、')} 的头像；${failed.join('、')} 获取失败`, true);
+    else setQQTip(`头像获取失败：${failed.join('、')}`, true);
+  }
+
+  el.qqBtn.addEventListener('click', useQQAvatar);
+  el.qq.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      useQQAvatar();
+    }
+  });
+  el.qq.addEventListener('input', () => {
+    if (!el.qqTip.classList.contains('bad')) setQQTip('');
+  });
 
   el.render.addEventListener('click', generate);
   el.sheet.addEventListener('click', renderSheet);
